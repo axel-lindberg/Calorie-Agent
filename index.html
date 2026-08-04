@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Calorie Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <main class="label">
+
+    <!-- Header styled like a nutrition facts panel -->
+    <header class="label__header">
+      <p class="label__eyebrow">Daily Log</p>
+      <h1 class="label__title">AI Calorie Tracker</h1>
+      <p class="label__subtitle">Tell it what you ate. It does the counting.</p>
+    </header>
+
+    <div class="rule rule--thick"></div>
+
+    <!-- Input section -->
+    <section class="entry" aria-label="Log a meal">
+      <label for="meal-input" class="entry__label">What did you eat?</label>
+      <textarea
+        id="meal-input"
+        class="entry__input"
+        placeholder="e.g. two scrambled eggs, a slice of sourdough toast, and a black coffee"
+        rows="3"
+      ></textarea>
+      <button type="button" class="entry__submit">Log meal</button>
+    </section>
+
+    <div class="rule rule--thin"></div>
+
+    <!-- Today's totals, nutrition-label style rows -->
+    <section class="totals" aria-label="Today's totals">
+      <div class="totals__row totals__row--main">
+        <span>Calories today</span>
+        <span class="totals__value">0 kcal</span>
+      </div>
+      <div class="rule rule--thin"></div>
+      <div class="totals__row">
+        <span>Protein</span>
+        <span class="totals__value">0 g</span>
+      </div>
+      <div class="totals__row">
+        <span>Carbs</span>
+        <span class="totals__value">0 g</span>
+      </div>
+      <div class="totals__row">
+        <span>Fat</span>
+        <span class="totals__value">0 g</span>
+      </div>
+    </section>
+
+    <div class="rule rule--thick"></div>
+
+    <!-- Log of entries, empty state for now -->
+    <section class="log" aria-label="Meal log">
+      <p class="log__empty">Nothing logged yet today — your first entry will show up here.</p>
+    </section>
+
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,205 @@
+:root {
+  --ink: #16302a;
+  --paper: #eef3ea;
+  --card: #ffffff;
+  --accent: #e63946;
+  --gold: #b6862c;
+  --line: #16302a;
+  --muted: #5b6b63;
+
+  --font-display: "Barlow Condensed", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 20px;
+  background: var(--paper);
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+/* ----------------------------------------
+   The "label" card — nutrition-facts styling
+---------------------------------------- */
+.label {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  padding: 28px 24px 32px;
+  border: 1px solid var(--ink);
+}
+
+.label__header {
+  text-align: left;
+}
+
+.label__eyebrow {
+  margin: 0 0 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.label__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 42px;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+
+.label__subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Rules, like the black bars on a nutrition label */
+.rule {
+  background: var(--line);
+  width: 100%;
+}
+
+.rule--thick {
+  height: 8px;
+  margin: 16px 0;
+}
+
+.rule--thin {
+  height: 1px;
+  margin: 12px 0;
+  background: #cdd6cd;
+}
+
+/* ----------------------------------------
+   Entry / input section
+---------------------------------------- */
+.entry__label {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.entry__input {
+  width: 100%;
+  resize: vertical;
+  padding: 12px 14px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+}
+
+.entry__input::placeholder {
+  color: var(--muted);
+}
+
+.entry__input:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.entry__submit {
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--card);
+  background: var(--accent);
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.entry__submit:hover {
+  background: #c62d3a;
+}
+
+.entry__submit:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------
+   Totals — nutrition-facts rows
+---------------------------------------- */
+.totals__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.totals__row--main {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+}
+
+.totals__value {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--gold);
+}
+
+.totals__row--main .totals__value {
+  color: var(--ink);
+  font-size: 20px;
+}
+
+/* ----------------------------------------
+   Log / empty state
+---------------------------------------- */
+.log__empty {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  padding: 18px 8px;
+  border: 1px dashed #cdd6cd;
+  border-radius: 2px;
+}
+
+/* ----------------------------------------
+   Responsive
+---------------------------------------- */
+@media (max-width: 480px) {
+  .label__title {
+    font-size: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry__submit {
+    transition: none;
+  }
+}
