@@ -12,3 +12,5 @@ if not OPENAI_API_KEY:
     )
 
 OPENAI_MODEL = "gpt-4o-mini"
+
+USDA_API_KEY = os.getenv("USDA_API_KEY")
