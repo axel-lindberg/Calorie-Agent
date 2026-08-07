@@ -1,23 +1,13 @@
-"""
-Data shapes shared across the pipeline.
+# Data shapes shared across the pipeline.
 
-Defining these as Pydantic models (rather than raw dicts) gives us two things:
-1. Automatic validation — if the AI returns something malformed, we find out
-   immediately instead of it silently breaking a later step.
-2. We can hand this same schema straight to OpenAI's structured output feature,
-   so the model is constrained to return exactly this shape.
-"""
 
 from pydantic import BaseModel, Field
 from typing import List
 
 
 class FoodItem(BaseModel):
-    # The food name exactly as the user said it, e.g. "toast"
     raw_name: str = Field(description="The food name as mentioned by the user")
 
-    # A normalized, generic name we'll use to search the nutrition database.
-    # e.g. "toast" -> "bread, white, toasted"
     canonical_name: str = Field(
         description=(
             "A generic, canonical form of this food suitable for looking up "
@@ -37,3 +27,15 @@ class FoodItem(BaseModel):
 
 class ParsedMeal(BaseModel):
     items: List[FoodItem]
+    
+class NutritionData(BaseModel):
+    # Nutrient values for a matched food, always per 100g.
+ 
+    fdc_id: int
+    matched_description: str  # the actual USDA food name we matched to
+    match_confidence: float  # 0-100 fuzzy match score, for debugging/thresholding
+ 
+    calories_per_100g: float
+    protein_g_per_100g: float
+    carbs_g_per_100g: float
+    fat_g_per_100g: float
