@@ -15,7 +15,12 @@ from models.schemas import NutritionData
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
 # fuzzy-match score (tweak this value)
-CONFIDENCE_THRESHOLD = 55.0
+CONFIDENCE_THRESHOLD = 50.0
+
+#Bonuses/penalties for score system
+RAW_BONUS = 20
+COOKING_PENALTY = 15
+PROCESSING_PENALTY = 20
 
 NUTRIENT_NAMES = {
     "calories": "Energy",
@@ -24,8 +29,30 @@ NUTRIENT_NAMES = {
     "carbs": "Carbohydrate, by difference",
 }
 
+COOKING_TERMS = {
+    "cooked",
+    "boiled",
+    "fried",
+    "grilled",
+    "roasted",
+    "baked",
+    "steamed",
+    "smoked",
+    "broiled",
+    "sauteed",
+}
 
-def _search_usda(query: str, page_size: int = 5) -> List[dict]:
+PROCESSING_TERMS = {
+    "breaded",
+    "battered",
+    "nugget",
+    "patty",
+    "roll",
+    "sausage",
+}
+
+
+def _search_usda(query: str, page_size: int = 10) -> List[dict]:
     response = requests.get(
         f"{BASE_URL}/foods/search",
         params={
@@ -66,6 +93,40 @@ def _to_nutrition_data(food: dict, confidence: float) -> Optional[NutritionData]
         carbs_g_per_100g=carbs,
         fat_g_per_100g=fat,
     )
+    
+def calculate_score(query: str, food: dict) -> float:
+    description = food.get("description", "")
+
+    query_lower = query.lower()
+    description_lower = description.lower()
+
+    #Get fuzzy score
+    score = fuzz.token_set_ratio(
+        query_lower,
+        description_lower
+    )
+    
+    #Give extra points if cooking style wasnt mentioned
+    user_specified_cooking = any(
+        term in query_lower
+        for term in COOKING_TERMS
+    )
+
+    if not user_specified_cooking:
+        if "raw" in description_lower or "uncooked" in description_lower:
+            score += RAW_BONUS
+        
+    # Penalize cooking methods that the user did not specify.
+    for term in COOKING_TERMS:
+        if term in description_lower and term not in query_lower:
+            score -= COOKING_PENALTY
+                
+    # Penalize processed foods that the user did not specify.
+    for term in PROCESSING_TERMS:
+        if term in description_lower and term not in query_lower:
+            score -= PROCESSING_PENALTY
+    
+    return score
 
 
 def lookup_nutrition(query: str) -> Optional[NutritionData]:
@@ -78,10 +139,14 @@ def lookup_nutrition(query: str) -> Optional[NutritionData]:
 
     # Score each candidate's description against our query text.
     scored = [
-        (fuzz.token_sort_ratio(query.lower(), food.get("description", "").lower()), food)
+        (calculate_score(query, food), food)
         for food in candidates
     ]
+    
     scored.sort(key=lambda pair: pair[0], reverse=True)
+    
+    for score, food in scored:
+        print(f"{score:.1f}  |  {food.get('description', '')}")
 
     for score, food in scored:
         if score < CONFIDENCE_THRESHOLD:
@@ -94,8 +159,7 @@ def lookup_nutrition(query: str) -> Optional[NutritionData]:
 
 
 if __name__ == "__main__":
-    # Manual test loop, same pattern as ai_parser.py's __main__.
-    # Try things like "toast", "chicken breast", "banana".
+    # Manual test loop
     print("Type a food name to look up (or 'quit' to exit):")
     while True:
         query = input("> ").strip()
