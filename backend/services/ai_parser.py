@@ -1,13 +1,10 @@
-"""
-Stage 1 of the pipeline: turn free-text input into structured food items.
-"""
+# Stage 1 of the pipeline: turn free-text input into structured food items.
 
 import sys
 import os
 import json
 
-# Allow running this file directly (`python services/ai_parser.py`) as well
-# as importing it as part of the backend package.
+# Allow running this file directly (`python services/ai_parser.py`) as well as importing it as part of the backend package.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from openai import OpenAI
