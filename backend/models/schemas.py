@@ -2,7 +2,7 @@
 
 
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 
 class FoodItem(BaseModel):
@@ -39,3 +39,10 @@ class NutritionData(BaseModel):
     protein_g_per_100g: float
     carbs_g_per_100g: float
     fat_g_per_100g: float
+    
+class MatchedItem(BaseModel):
+    raw_name: str
+    canonical_name: str
+    quantity: float
+    unit: str
+    nutrion: Optional[NutritionData] = None
