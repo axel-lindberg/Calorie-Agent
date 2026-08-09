@@ -97,6 +97,13 @@ def _to_nutrition_data(
         fat_g_per_100g=max(0.0, fat),
     )
 
+def word_coverage(query_tokens:set, description_tokens:set) -> float:
+    if not query_tokens:
+        return 100
+    return sum(
+        max((fuzz.ratio(q, d) for d in description_tokens), default=0)
+        for q in query_tokens
+    ) / len(query_tokens)
 
 def calculate_score(query: str, food: dict) -> float:
     description = food.get("description", "")
@@ -104,10 +111,13 @@ def calculate_score(query: str, food: dict) -> float:
     query_lower = query.lower()
     description_lower = description.lower()
 
-    score = fuzz.token_sort_ratio(query_lower, description_lower)
-
     query_tokens = _tokenize(query_lower)
     description_tokens = _tokenize(description_lower)
+    
+    whole_string_score = fuzz.token_sort_ratio(query_lower, description_lower)
+    coverage_score = word_coverage(query_tokens, description_tokens)
+        
+    score = min(whole_string_score, coverage_score)
 
     user_specified_cooking = bool(query_tokens & COOKING_TERMS)
     if not user_specified_cooking:
@@ -133,9 +143,10 @@ def lookup_nutrition(query: str, verbose: bool = False) -> Optional[NutritionDat
     scored = [(calculate_score(query, food), food) for food in candidates]
     scored.sort(key=lambda pair: pair[0], reverse=True)
 
-    if verbose:
-        for score, food in scored:
-            print(f"{score:5.1f}  |  [{food.get('dataType')}]  {food.get('description', '')}")
+    #uncomment for debugging
+    # if verbose:
+    #     for score, food in scored:
+    #         print(f"{score:5.1f}  |  [{food.get('dataType')}]  {food.get('description', '')}")
 
     for score, food in scored:
         if score < CONFIDENCE_THRESHOLD:
