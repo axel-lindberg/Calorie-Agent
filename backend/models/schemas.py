@@ -45,4 +45,4 @@ class MatchedItem(BaseModel):
     canonical_name: str
     quantity: float
     unit: str
-    nutrion: Optional[NutritionData] = None
+    nutrition: Optional[NutritionData] = None
