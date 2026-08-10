@@ -7,7 +7,7 @@ import re
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, utils
 from typing import Optional, List
 
 from config import USDA_API_KEY
@@ -16,7 +16,7 @@ from models.schemas import NutritionData
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
 # Below this score, we don't trust the result enough to auto-accept it.
-CONFIDENCE_THRESHOLD = 40.0
+CONFIDENCE_THRESHOLD = 60.0
 
 # Foundation Foods use "Energy (Atwater General/Specific Factors)" instead
 # of plain "Energy" (which SR Legacy uses) — try each name in order.
@@ -84,18 +84,19 @@ def _to_nutrition_data(
     )
     
 def _fuzzy_foods(query: str, foods: List[dict]) -> List[dict]:
-    filteredFoods = []
+    scored = []
     
     for food in foods:
         description = food.get("description", "")
-        score = fuzz.token_sort_ratio(query, description)
+        score = fuzz.token_sort_ratio(query, description, processor=utils.default_process)
         
+        #Uncomment for testing
         print(f"{score:5.1f} | {description}")
         
         if score >= CONFIDENCE_THRESHOLD:
-            filteredFoods.append(food)
+            scored.append(food)
     
-    return filteredFoods
+    return scored
 
 def calculate_score(query: str, food: dict) -> float:
     description = food.get("description", "")
