@@ -16,7 +16,7 @@ from models.schemas import NutritionData
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
 # Below this score, we don't trust the result enough to auto-accept it.
-CONFIDENCE_THRESHOLD = 60.0
+CONFIDENCE_THRESHOLD = 50.0
 
 # Foundation Foods use "Energy (Atwater General/Specific Factors)" instead
 # of plain "Energy" (which SR Legacy uses) — try each name in order.
@@ -32,7 +32,7 @@ def _tokenize(text: str) -> set:
     return set(re.findall(r"[a-z]+", text.lower()))
 
 #change page_size to get more items
-def _search_usda(query: str, page_size: int = 20) -> List[dict]:
+def _search_usda(query: str, page_size: int = 25) -> List[dict]:
     # dataType must be a list, not a comma-string — the API treats it as an
     # array param and silently ignores a comma-joined string, letting
     # Branded results slip through.
@@ -83,20 +83,22 @@ def _to_nutrition_data(
         fat_g_per_100g=max(0.0, fat),
     )
     
-def _fuzzy_foods(query: str, foods: List[dict]) -> List[dict]:
+def _pre_filter(query: str, foods: List[dict], limit_num: int, verbose: bool = False) -> List[dict]:
     scored = []
     
     for food in foods:
         description = food.get("description", "")
         score = fuzz.token_sort_ratio(query, description, processor=utils.default_process)
         
-        #Uncomment for testing
-        print(f"{score:5.1f} | {description}")
+        if verbose:
+            print(f"{score:5.1f} | {description}")
         
         if score >= CONFIDENCE_THRESHOLD:
-            scored.append(food)
+            scored.append((score, food))
+            
+    scored.sort(key=lambda pair: pair[0], reverse=True)
     
-    return scored
+    return scored[:limit_num]
 
 def calculate_score(query: str, food: dict) -> float:
     description = food.get("description", "")
@@ -160,8 +162,8 @@ if __name__ == "__main__":
 
     query = "chicken breast, raw"
 
-    filtered = _fuzzy_foods(query, test_foods)
+    filtered = _pre_filter(query, test_foods, 10, True)
 
     print("Filtered foods:")
-    for food in filtered:
-        print(food["description"])
+    for score, food in filtered:
+        print(f"{score:5.1f} | {food.get('description','')}")
