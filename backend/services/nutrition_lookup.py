@@ -15,11 +15,8 @@ from models.schemas import NutritionData
 
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
-# Below this score, we don't trust the result enough to auto-accept it.
-CONFIDENCE_THRESHOLD = 50.0
+# CONFIDENCE_THRESHOLD = 40.0
 
-# Foundation Foods use "Energy (Atwater General/Specific Factors)" instead
-# of plain "Energy" (which SR Legacy uses) — try each name in order.
 NUTRIENT_NAMES = {
     "calories": ["Energy", "Energy (Atwater General Factors)", "Energy (Atwater Specific Factors)"],
     "protein": ["Protein"],
@@ -33,9 +30,6 @@ def _tokenize(text: str) -> set:
 
 #change page_size to get more items
 def _search_usda(query: str, page_size: int = 25) -> List[dict]:
-    # dataType must be a list, not a comma-string — the API treats it as an
-    # array param and silently ignores a comma-joined string, letting
-    # Branded results slip through.
     response = requests.get(
         f"{BASE_URL}/foods/search",
         params={
@@ -59,9 +53,7 @@ def _extract_nutrient(food: dict, nutrient_names: List[str]) -> Optional[float]:
     return None
 
 
-def _to_nutrition_data(
-    food: dict, confidence: float, verbose: bool = False
-) -> Optional[NutritionData]:
+def _to_nutrition_data(food: dict, confidence: float, verbose: bool = False) -> Optional[NutritionData]:
     calories = _extract_nutrient(food, NUTRIENT_NAMES["calories"])
     protein = _extract_nutrient(food, NUTRIENT_NAMES["protein"])
     fat = _extract_nutrient(food, NUTRIENT_NAMES["fat"])
@@ -83,51 +75,41 @@ def _to_nutrition_data(
         fat_g_per_100g=max(0.0, fat),
     )
     
+def _has_required_nutrients(food: dict) -> bool:
+    return all (_extract_nutrient(food, NUTRIENT_NAMES[n]) is not None 
+                for n in ("calories", "protein", "fat", "carbs"))
+    
 def _pre_filter(query: str, foods: List[dict], limit_num: int, verbose: bool = False) -> List[dict]:
     scored = []
     
     for food in foods:
         description = food.get("description", "")
         score = fuzz.token_sort_ratio(query, description, processor=utils.default_process)
-        
-        if verbose:
-            print(f"{score:5.1f} | {description}")
-        
-        if score >= CONFIDENCE_THRESHOLD:
-            scored.append((score, food))
-            
+        scored.append((score, food))
+                 
     scored.sort(key=lambda pair: pair[0], reverse=True)
     
-    return scored[:limit_num]
-
-def calculate_score(query: str, food: dict) -> float:
-    description = food.get("description", "")
-
-    query_lower = query.lower()
-    description_lower = description.lower()
+    if verbose:
+            print(f"{score:5.1f} | {description}")
     
-    score = fuzz.token_sort_ratio(query_lower, description_lower)
+    hasNutrients = [(score, food) for score, food in scored if _has_required_nutrients(food)]
+    return hasNutrients[:limit_num]
 
-    return score
 
-
-def lookup_nutrition(query: str, verbose: bool = False) -> Optional[NutritionData]:
+def lookup_nutrition(query: str, verbose = False) -> Optional[NutritionData]:
     candidates = _search_usda(query)
     if not candidates:
         return None
-
-    scored = [(calculate_score(query, food), food) for food in candidates]
-    scored.sort(key=lambda pair: pair[0], reverse=True)
-
-    #For debugging
+            
+    filtered_candidates = _pre_filter(query, candidates, 10, False)
+    
     if verbose:
-        for score, food in scored:
-            print(f"{score:5.1f}  |  [{food.get('dataType')}]  {food.get('description', '')}")
+        for score, food in filtered_candidates:
+            print(f"{score:5.1f} | {food.get('description','')}")  
 
-    for score, food in scored:
-        if score < CONFIDENCE_THRESHOLD:
-            break
-        result = _to_nutrition_data(food, confidence=score, verbose=verbose)
+    #returns first result with complete nutrional data
+    for score, candidate in filtered_candidates:
+        result = _to_nutrition_data(candidate, confidence=score, verbose=False)
         if result is not None:
             return result
 
@@ -135,35 +117,17 @@ def lookup_nutrition(query: str, verbose: bool = False) -> Optional[NutritionDat
 
 
 if __name__ == "__main__":
-    # print("Type a food name to look up (or 'quit' to exit):")
-    # while True:
-    #     query = input("> ").strip()
-    #     if query.lower() in ("quit", "exit"):
-    #         break
-    #     if not query:
-    #         continue
+    print("Type a food name to look up (or 'quit' to exit):")
+    while True:
+        query = input("> ").strip()
+        if query.lower() in ("quit", "exit"):
+            break
+        if not query:
+            continue
 
-    #     result = lookup_nutrition(query, verbose=True)
-    #     if result is None:
-    #         print(f"No confident match found for '{query}'.")
-    #     else:
-    #         print(result.model_dump_json(indent=2))
-    test_foods = [
-        {"description": "Chicken breast, raw"},
-        {"description": "Chicken, breast, meat and skin, raw"},
-        {"description": "Chicken, ground, raw"},
-        {"description": "Chicken, breast, boneless, skinless, raw"},
-        {"description": "Chicken, ground, with additives, raw"},
-        {"description": "Chicken breast, roasted"},
-        {"description": "Bratwurst, chicken, cooked"},
-        {"description": "Beef steak, grilled"},
-        {"description": "Chicken nuggets"},
-    ]
-
-    query = "chicken breast, raw"
-
-    filtered = _pre_filter(query, test_foods, 10, True)
-
-    print("Filtered foods:")
-    for score, food in filtered:
-        print(f"{score:5.1f} | {food.get('description','')}")
+        result = lookup_nutrition(query, True)
+      
+        if result is None:
+            print(f"No confident match found for '{query}'.")
+        else:
+            print(result.model_dump_json(indent=2))
