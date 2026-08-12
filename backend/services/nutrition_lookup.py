@@ -7,24 +7,17 @@ import re
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, utils
 from typing import Optional, List
 
 from config import USDA_API_KEY
 from models.schemas import NutritionData
+from services.ai_matcher import select_best_match
 
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
-# Below this score, we don't trust the result enough to auto-accept it.
-CONFIDENCE_THRESHOLD = 60.0
+# CONFIDENCE_THRESHOLD = 40.0
 
-# Bonuses/penalties layered on top of the base fuzzy score.
-RAW_BONUS = 20
-COOKING_PENALTY = 15
-PROCESSING_PENALTY = 20
-
-# Foundation Foods use "Energy (Atwater General/Specific Factors)" instead
-# of plain "Energy" (which SR Legacy uses) — try each name in order.
 NUTRIENT_NAMES = {
     "calories": ["Energy", "Energy (Atwater General Factors)", "Energy (Atwater Specific Factors)"],
     "protein": ["Protein"],
@@ -32,24 +25,12 @@ NUTRIENT_NAMES = {
     "carbs": ["Carbohydrate, by difference"],
 }
 
-COOKING_TERMS = {
-    "cooked", "boiled", "fried", "grilled", "roasted", "baked",
-    "steamed", "smoked", "broiled", "sauteed",
-}
-
-PROCESSING_TERMS = {
-    "breaded", "battered", "nugget", "patty", "roll", "sausage",
-}
-
 
 def _tokenize(text: str) -> set:
     return set(re.findall(r"[a-z]+", text.lower()))
 
 #change page_size to get more items
-def _search_usda(query: str, page_size: int = 15) -> List[dict]:
-    # dataType must be a list, not a comma-string — the API treats it as an
-    # array param and silently ignores a comma-joined string, letting
-    # Branded results slip through.
+def _search_usda(query: str, page_size: int = 25) -> List[dict]:
     response = requests.get(
         f"{BASE_URL}/foods/search",
         params={
@@ -73,9 +54,7 @@ def _extract_nutrient(food: dict, nutrient_names: List[str]) -> Optional[float]:
     return None
 
 
-def _to_nutrition_data(
-    food: dict, confidence: float, verbose: bool = False
-) -> Optional[NutritionData]:
+def _to_nutrition_data(food: dict, confidence: float, verbose: bool = False) -> Optional[NutritionData]:
     calories = _extract_nutrient(food, NUTRIENT_NAMES["calories"])
     protein = _extract_nutrient(food, NUTRIENT_NAMES["protein"])
     fat = _extract_nutrient(food, NUTRIENT_NAMES["fat"])
@@ -96,66 +75,48 @@ def _to_nutrition_data(
         carbs_g_per_100g=max(0.0, carbs),
         fat_g_per_100g=max(0.0, fat),
     )
-
-def word_coverage(query_tokens:set, description_tokens:set) -> float:
-    if not query_tokens:
-        return 100
-    return sum(
-        max((fuzz.ratio(q, d) for d in description_tokens), default=0)
-        for q in query_tokens
-    ) / len(query_tokens)
-
-def calculate_score(query: str, food: dict) -> float:
-    description = food.get("description", "")
-
-    query_lower = query.lower()
-    description_lower = description.lower()
-
-    query_tokens = _tokenize(query_lower)
-    description_tokens = _tokenize(description_lower)
     
-    whole_string_score = fuzz.token_sort_ratio(query_lower, description_lower)
-    coverage_score = word_coverage(query_tokens, description_tokens)
-        
-    score = min(whole_string_score, coverage_score)
+def _has_required_nutrients(food: dict) -> bool:
+    return all (_extract_nutrient(food, NUTRIENT_NAMES[n]) is not None 
+                for n in ("calories", "protein", "fat", "carbs"))
+    
+def _pre_filter(query: str, foods: List[dict], limit_num: int, verbose: bool = False) -> List[dict]:
+    scored = []
+    
+    for food in foods:
+        description = food.get("description", "")
+        score = fuzz.token_sort_ratio(query, description, processor=utils.default_process)
+        scored.append((score, food))
+                 
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    
+    if verbose:
+            print(f"{score:5.1f} | {description}")
+    
+    hasNutrients = [(score, food) for score, food in scored if _has_required_nutrients(food)]
+    return hasNutrients[:limit_num]
 
-    user_specified_cooking = bool(query_tokens & COOKING_TERMS)
-    if not user_specified_cooking:
-        if "raw" in description_tokens or "uncooked" in description_tokens:
-            score += RAW_BONUS
 
-    for term in COOKING_TERMS & description_tokens:
-        if term not in query_tokens:
-            score -= COOKING_PENALTY
-
-    for term in PROCESSING_TERMS & description_tokens:
-        if term not in query_tokens:
-            score -= PROCESSING_PENALTY
-
-    return score
-
-
-def lookup_nutrition(query: str, verbose: bool = False) -> Optional[NutritionData]:
+def lookup_nutrition(query: str, verbose = False) -> Optional[NutritionData]:
     candidates = _search_usda(query)
     if not candidates:
         return None
+            
+    filtered_candidates = _pre_filter(query, candidates, 10, False)
+    
+    if verbose:
+        for score, food in filtered_candidates:
+            print(f"{score:5.1f} | {food.get('description','')}")
+            
+    if not filtered_candidates:
+        return None
+    
+    selected = select_best_match(query, filtered_candidates, verbose=True)
+    if selected is None:
+        return None
 
-    scored = [(calculate_score(query, food), food) for food in candidates]
-    scored.sort(key=lambda pair: pair[0], reverse=True)
-
-    #uncomment for debugging
-    # if verbose:
-    #     for score, food in scored:
-    #         print(f"{score:5.1f}  |  [{food.get('dataType')}]  {food.get('description', '')}")
-
-    for score, food in scored:
-        if score < CONFIDENCE_THRESHOLD:
-            break
-        result = _to_nutrition_data(food, confidence=score, verbose=verbose)
-        if result is not None:
-            return result
-
-    return None
+    score, food = selected
+    return _to_nutrition_data(food, confidence=score, verbose=verbose)
 
 
 if __name__ == "__main__":
@@ -166,8 +127,9 @@ if __name__ == "__main__":
             break
         if not query:
             continue
-
-        result = lookup_nutrition(query, verbose=True)
+ 
+        result = lookup_nutrition(query, True)
+      
         if result is None:
             print(f"No confident match found for '{query}'.")
         else:

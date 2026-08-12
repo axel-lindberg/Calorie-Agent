@@ -1,10 +1,9 @@
-# Stage 1 of the pipeline: turn free-text input into structured food items.
+# Turn free-text input into structured food items.
 
 import sys
 import os
 import json
 
-# Allow running this file directly (`python services/ai_parser.py`) as well as importing it as part of the backend package.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from openai import OpenAI
@@ -29,15 +28,7 @@ in free text. Extract every distinct food item mentioned, with:
 Only extract actual food/drink items. Ignore filler words.
 """
 
-
 def parse_meal_text(text: str) -> ParsedMeal:
-    """
-    Calls OpenAI to convert a free-text meal description into a ParsedMeal.
-
-    Uses structured outputs (response_format=ParsedMeal) so the API response
-    is guaranteed to match our Pydantic schema — no manual JSON parsing or
-    prompt-begging for "respond only in JSON" needed.
-    """
     completion = client.beta.chat.completions.parse(
         model=OPENAI_MODEL,
         messages=[
