@@ -1,9 +1,7 @@
 # Data shapes shared across the pipeline.
 
-
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
 
 class FoodItem(BaseModel):
     raw_name: str = Field(description="The food name as mentioned by the user")
@@ -23,6 +21,13 @@ class FoodItem(BaseModel):
             "If the user gave no unit, use 'serving'."
         )
     )
+    
+class FoodMatchSelection(BaseModel):
+    selected_fdc_id: Optional[int] = Field(
+        description="fdcId of the candidate that is truly the same food as "
+        "the query, or null if none of the candidates qualify."
+    )
+    reasoning: str = Field(description="One brief sentence explaining the choice.")
 
 
 class ParsedMeal(BaseModel):
@@ -41,8 +46,8 @@ class NutritionData(BaseModel):
     fat_g_per_100g: float
     
 class MatchedItem(BaseModel):
-    raw_name: str
-    canonical_name: str
+    raw_name: str #input from user
+    canonical_name: str #canonical form of user input
     quantity: float
     unit: str
     nutrition: Optional[NutritionData] = None
