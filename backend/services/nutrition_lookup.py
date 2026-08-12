@@ -12,6 +12,7 @@ from typing import Optional, List
 
 from config import USDA_API_KEY
 from models.schemas import NutritionData
+from services.ai_matcher import select_best_match
 
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
@@ -105,15 +106,17 @@ def lookup_nutrition(query: str, verbose = False) -> Optional[NutritionData]:
     
     if verbose:
         for score, food in filtered_candidates:
-            print(f"{score:5.1f} | {food.get('description','')}")  
+            print(f"{score:5.1f} | {food.get('description','')}")
+            
+    if not filtered_candidates:
+        return None
+    
+    selected = select_best_match(query, filtered_candidates, verbose=True)
+    if selected is None:
+        return None
 
-    #returns first result with complete nutrional data
-    for score, candidate in filtered_candidates:
-        result = _to_nutrition_data(candidate, confidence=score, verbose=False)
-        if result is not None:
-            return result
-
-    return None
+    score, food = selected
+    return _to_nutrition_data(food, confidence=score, verbose=verbose)
 
 
 if __name__ == "__main__":
@@ -124,7 +127,7 @@ if __name__ == "__main__":
             break
         if not query:
             continue
-
+ 
         result = lookup_nutrition(query, True)
       
         if result is None:
