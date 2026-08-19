@@ -65,3 +65,4 @@ class CalculatedItem(BaseModel):
     protein_g: Optional[float] = None
     carbs_g: Optional[float] = None
     fat_g: Optional[float] = None
+    nutrition: Optional[NutritionData] = None
