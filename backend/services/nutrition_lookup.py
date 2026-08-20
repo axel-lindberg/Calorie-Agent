@@ -16,13 +16,21 @@ from services.ai_matcher import select_best_match
 
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
-# CONFIDENCE_THRESHOLD = 40.0
-
 NUTRIENT_NAMES = {
     "calories": ["Energy", "Energy (Atwater General Factors)", "Energy (Atwater Specific Factors)"],
     "protein": ["Protein"],
     "fat": ["Total lipid (fat)"],
     "carbs": ["Carbohydrate, by difference"],
+}
+
+# USDA sometimes lists a nutrient more than once with different units
+# (e.g. Energy in both KCAL and kJ). Pin the unit we actually want so we
+# don't silently grab the wrong one.
+NUTRIENT_UNITS = {
+    "calories": "KCAL",
+    "protein": "G",
+    "fat": "G",
+    "carbs": "G",
 }
 
 
@@ -45,20 +53,33 @@ def _search_usda(query: str, page_size: int = 25) -> List[dict]:
     return response.json().get("foods", [])
 
 
-def _extract_nutrient(food: dict, nutrient_names: List[str]) -> Optional[float]:
+def _extract_nutrient(food: dict, nutrient_key: str) -> Optional[float]:
+    names = NUTRIENT_NAMES[nutrient_key]
+    expected_unit = NUTRIENT_UNITS[nutrient_key]
     entries = food.get("foodNutrients", [])
-    for name in nutrient_names:
+
+    # Preferred: name AND unit match, so e.g. Energy(kJ) doesn't get
+    # picked up in place of Energy(KCAL).
+    for name in names:
+        for entry in entries:
+            if entry.get("nutrientName") == name and entry.get("unitName", "").upper() == expected_unit:
+                return entry.get("value")
+
+    # Fallback: name matches but unit is missing/unexpected. Rare, but
+    # better to return something than nothing.
+    for name in names:
         for entry in entries:
             if entry.get("nutrientName") == name:
                 return entry.get("value")
+
     return None
 
 
 def _to_nutrition_data(food: dict, confidence: float, verbose: bool = False) -> Optional[NutritionData]:
-    calories = _extract_nutrient(food, NUTRIENT_NAMES["calories"])
-    protein = _extract_nutrient(food, NUTRIENT_NAMES["protein"])
-    fat = _extract_nutrient(food, NUTRIENT_NAMES["fat"])
-    carbs = _extract_nutrient(food, NUTRIENT_NAMES["carbs"])
+    calories = _extract_nutrient(food, "calories")
+    protein = _extract_nutrient(food, "protein")
+    fat = _extract_nutrient(food, "fat")
+    carbs = _extract_nutrient(food, "carbs")
 
     missing = [n for n, v in {"calories": calories, "protein": protein, "fat": fat, "carbs": carbs}.items() if v is None]
     if missing:
@@ -75,24 +96,24 @@ def _to_nutrition_data(food: dict, confidence: float, verbose: bool = False) -> 
         carbs_g_per_100g=max(0.0, carbs),
         fat_g_per_100g=max(0.0, fat),
     )
-    
+
 def _has_required_nutrients(food: dict) -> bool:
-    return all (_extract_nutrient(food, NUTRIENT_NAMES[n]) is not None 
-                for n in ("calories", "protein", "fat", "carbs"))
-    
+    return all(_extract_nutrient(food, n) is not None
+               for n in ("calories", "protein", "fat", "carbs"))
+
 def _pre_filter(query: str, foods: List[dict], limit_num: int, verbose: bool = False) -> List[dict]:
     scored = []
-    
+
     for food in foods:
         description = food.get("description", "")
         score = fuzz.token_sort_ratio(query, description, processor=utils.default_process)
         scored.append((score, food))
-                 
+
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    
+
     if verbose:
             print(f"{score:5.1f} | {description}")
-    
+
     hasNutrients = [(score, food) for score, food in scored if _has_required_nutrients(food)]
     return hasNutrients[:limit_num]
 
@@ -101,16 +122,16 @@ def lookup_nutrition(query: str, verbose = False) -> Optional[NutritionData]:
     candidates = _search_usda(query)
     if not candidates:
         return None
-            
+
     filtered_candidates = _pre_filter(query, candidates, 10, False)
-    
+
     if verbose:
         for score, food in filtered_candidates:
             print(f"{score:5.1f} | {food.get('description','')}")
-            
+
     if not filtered_candidates:
         return None
-    
+
     selected = select_best_match(query, filtered_candidates, verbose=True)
     if selected is None:
         return None
@@ -127,9 +148,9 @@ if __name__ == "__main__":
             break
         if not query:
             continue
- 
+
         result = lookup_nutrition(query, True)
-      
+
         if result is None:
             print(f"No confident match found for '{query}'.")
         else:

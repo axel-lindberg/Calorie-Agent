@@ -51,3 +51,18 @@ class MatchedItem(BaseModel):
     quantity: float
     unit: str
     nutrition: Optional[NutritionData] = None
+    
+
+class GramEstimate(BaseModel):
+    grams: float = Field(description="Estimated weight in grams for this quantity/unit of this specific food.")
+    reasoning: str = Field(description="One brief sentence explaining the estimate.")
+
+class CalculatedItem(BaseModel):
+    raw_name: str
+    canonical_name: str
+    grams: Optional[float] = None
+    calories: Optional[float] = None
+    protein_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    nutrition: Optional[NutritionData] = None
