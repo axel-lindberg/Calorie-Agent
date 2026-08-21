@@ -66,3 +66,11 @@ class CalculatedItem(BaseModel):
     carbs_g: Optional[float] = None
     fat_g: Optional[float] = None
     nutrition: Optional[NutritionData] = None
+
+
+class LogMealRequest(BaseModel):
+    text: str
+
+class LogMealResponse(BaseModel):
+    meal_id: int
+    items: List[CalculatedItem]
