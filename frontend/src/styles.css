@@ -146,6 +146,18 @@ body {
   outline-offset: 2px;
 }
 
+.entry__submit:disabled {
+  background: var(--muted);
+  cursor: default;
+}
+
+.entry__error {
+  margin: 8px 0 0;
+  min-height: 16px;
+  font-size: 13px;
+  color: var(--accent);
+}
+
 /* ----------------------------------------
    Totals — nutrition-facts rows
 ---------------------------------------- */
@@ -187,6 +199,36 @@ body {
   padding: 18px 8px;
   border: 1px dashed #cdd6cd;
   border-radius: 2px;
+}
+
+.log__entry {
+  padding: 10px 0;
+  border-bottom: 1px dashed #cdd6cd;
+}
+
+.log__entry:last-child {
+  border-bottom: none;
+}
+
+.log__entry-time {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.log__entry-text {
+  margin: 2px 0 6px;
+  font-size: 14px;
+}
+
+.log__entry-items {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 /* ----------------------------------------
